@@ -1,0 +1,74 @@
+pasyuto.png
+size:1983,660
+filter:Linear,Linear
+pma:false
+しっぽ 2
+bounds:833,269,389,340
+offsets:1,1,391,342
+rotate:90
+フード（前） 2
+bounds:264,200,458,380
+offsets:1,1,460,382
+rotate:90
+レイヤー 5
+bounds:1213,318,340,297
+offsets:1,1,342,299
+rotate:90
+体 2
+bounds:920,9,170,258
+offsets:1,1,172,260
+右おしり
+bounds:1092,21,165,246
+offsets:2,1,169,249
+右ローブ
+bounds:1367,5,275,311
+offsets:1,1,277,313
+右腕 2
+bounds:585,5,193,170
+offsets:1,1,195,172
+rotate:90
+右足 2
+bounds:2,24,120,249
+offsets:2,1,123,252
+rotate:90
+左おしり
+bounds:1790,430,191,228
+offsets:2,1,194,230
+左ローブ
+bounds:1569,362,219,296
+offsets:1,1,221,298
+左腕 2
+bounds:1790,255,173,186
+offsets:1,1,175,188
+rotate:90
+左足 2
+bounds:1644,7,113,246
+offsets:1,1,116,248
+杖
+bounds:646,255,185,403
+offsets:1,1,187,405
+目
+bounds:253,27,330,117
+offsets:1,1,332,119
+目（閉）
+bounds:1512,327,331,55
+offsets:1,1,334,58
+rotate:90
+耳（前） 2
+bounds:1759,10,204,243
+offsets:1,1,207,245
+耳（後） 2
+bounds:757,6,161,247
+offsets:1,1,163,249
+頬
+bounds:1175,292,366,36
+offsets:1,1,369,38
+rotate:90
+顔 2
+bounds:2,146,512,260
+offsets:2,1,515,262
+rotate:90
+＞＜
+bounds:1259,2,314,106
+offsets:1,2,316,109
+rotate:90

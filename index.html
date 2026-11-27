@@ -112,6 +112,7 @@ kbd { font-family: var(--font-body); font-weight: 800; font-size: 12px; backgrou
 
 <div class="panel" id="panel" hidden></div>
 
+<script src="vendor/spine-canvas.min.js"></script>
 <script>
 (() => {
 'use strict';
@@ -185,7 +186,75 @@ const sprite = new Image();
 let spriteReady = false;
 sprite.onload = () => { spriteReady = true; };
 sprite.src = 'assets/pasyuto.png';
-const SPRITE_NATURAL_FACING = -1; // 元の絵は左向き（しっぽが右側）として扱う
+const SPRITE_NATURAL_FACING = -1; // 予備の1枚絵は左向き（しっぽが右側）として扱う
+
+// ===================== Spine =====================
+// assets/spine/ の pasyuto.json / .atlas / .png を読み込む。失敗したら1枚絵で表示する
+const SPINE_SCALE = 0.1;            // Spine上の約830px → ゲーム内で約83px
+const SPINE_NATURAL_FACING = 1;     // Spineのデータは右向き
+let sp = null;
+(async () => {
+  try {
+    if (!window.spine) throw new Error('spine runtime not loaded');
+    const am = new spine.AssetManager('assets/spine/');
+    am.loadText('pasyuto.json');
+    am.loadTextureAtlas('pasyuto.atlas');
+    await am.loadAll();
+    const json = new spine.SkeletonJson(new spine.AtlasAttachmentLoader(am.require('pasyuto.atlas')));
+    json.scale = SPINE_SCALE;
+    const data = json.readSkeletonData(am.require('pasyuto.json'));
+    // blink は目だけを動かす。おしりの表示切り替えキーが入っていると噴射中におしりが消えるので取り除く
+    const blink = data.findAnimation('blink');
+    if (blink) {
+      const hide = ['右おしり', '左おしり'].map(n => data.findSlot(n)).filter(Boolean).map(sl => sl.index);
+      blink.setTimelines(blink.timelines.filter(t => !(t instanceof spine.AttachmentTimeline && hide.includes(t.slotIndex))));
+    }
+    const skeleton = new spine.Skeleton(data);
+    skeleton.setToSetupPose();
+    const stateData = new spine.AnimationStateData(data);
+    stateData.defaultMix = .08;
+    stateData.setMix('fart_start', 'fart_air', 0);
+    const state = new spine.AnimationState(stateData);
+    state.setAnimation(0, 'idle', true);
+    const renderer = new spine.SkeletonRenderer(ctx);
+    renderer.triangleRendering = false;
+    const buttSlot = skeleton.findSlot('butt');
+    sp = { skeleton, state, renderer, cur: 'idle', blinkT: 2, buttSlot, buttAtt: buttSlot && skeleton.getAttachment(buttSlot.data.index, 'butt'), v: new spine.Vector2() };
+  } catch (e) { console.warn('Spineを読み込めなかったので1枚絵で表示します', e); }
+})();
+
+function updateSpine(dt) {
+  if (!sp) return;
+  const p = player, st = sp.state;
+  let want = 'idle';
+  if (p.thrusting || p.dashT > 0) want = 'fart_air';
+  else if (p.onGround && Math.abs(p.vx) > 30) want = 'run';
+  if (want !== sp.cur) {
+    if (want === 'fart_air') { st.clearTrack(1); st.setAnimation(0, 'fart_start', false); st.addAnimation(0, 'fart_air', true, 0); }
+    else st.setAnimation(0, want, true);
+    sp.cur = want;
+  }
+  const e0 = st.getCurrent(0);
+  if (e0) e0.timeScale = want === 'run' ? clamp(Math.abs(p.vx) / P.moveSpeed, .6, 1.8) : 1;
+  // まばたき（噴射中は ＞＜ の顔なのでしない）
+  sp.blinkT -= dt;
+  if (sp.blinkT <= 0) {
+    sp.blinkT = rand(2, 5);
+    if (want !== 'fart_air') { st.setAnimation(1, 'blink', false); st.addEmptyAnimation(1, 0, 0); }
+  }
+  st.update(dt);
+}
+function poseSpine() {
+  const p = player, sk = sp.skeleton;
+  let sx = 1, sy = 1;
+  if (p.onGround) { if (p.land > 0) { sy = .88; sx = 1.1; } }
+  else if (!p.thrusting) { if (p.vy < -150) { sx = .93; sy = 1.07; } else if (p.vy > 300) { sx = .96; sy = 1.04; } }
+  sk.x = p.x + p.w / 2; sk.y = p.y + p.h + 2;
+  sk.scaleX = sx * (p.facing === SPINE_NATURAL_FACING ? 1 : -1);
+  sk.scaleY = -sy; // Spineは上がプラス、キャンバスは下がプラス
+  sp.state.apply(sk);
+  sk.updateWorldTransform(spine.Physics ? spine.Physics.update : undefined);
+}
 
 // ===================== ステージ =====================
 const WORLD_W = 4500, WORLD_H = 1000, GY = 900;
@@ -449,7 +518,11 @@ function spawnPuff(x, y, vx, vy, opt = {}) {
 function addText(x, y, str, color = '#fff8e6', size = 18, life = .9, vy = -50) { texts.push({ x, y, str, color, size, life, max: life, vy, rot: rand(-.15, .15) }); }
 function addParts(x, y, n, color, spd = 200) { for (let i = 0; i < n; i++) { const a = rand(0, Math.PI * 2), s = rand(.3, 1) * spd; parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 60, life: rand(.3, .7), max: .7, color, r: rand(2, 5) }); } }
 
-function butt() { const p = player; return { x: p.x + p.w / 2 - p.facing * 8, y: p.y + p.h - 10 }; }
+function butt() {
+  const p = player;
+  if (sp && sp.buttAtt) { const v = sp.buttAtt.computeWorldPosition(sp.buttSlot.bone, sp.v); return { x: v.x, y: v.y }; }
+  return { x: p.x + p.w / 2 - p.facing * 8, y: p.y + p.h - 10 };
+}
 
 // ===================== おなら =====================
 function startThrust(voice) {
@@ -793,11 +866,18 @@ function drawPlayer() {
   }
   if (p.thrusting) { jx = rand(-1.2, 1.2); jy = rand(-1, 1); sy *= 1.03; }
   if (p.dashT > 0) { rot = p.facing * .25; sx *= 1.05; }
+  if (sp) {
+    poseSpine();
+    if (p.thrusting) { ctx.save(); ctx.translate(rand(-1, 1), rand(-1, 1)); }
+    sp.renderer.draw(sp.skeleton);
+    if (p.thrusting) ctx.restore();
+  } else {
   const size = 76;
   ctx.save(); ctx.translate(cx + jx, by + jy); ctx.rotate(rot); ctx.scale(sx * (p.facing === SPRITE_NATURAL_FACING ? 1 : -1), sy);
   if (spriteReady) ctx.drawImage(sprite, -size / 2, -size, size, size);
   else { ctx.fillStyle = '#222'; ctx.fillRect(-16, -50, 32, 50); }
   ctx.restore();
+  }
   if (p.pusuT > 0) {
     ctx.fillStyle = '#7ec8ff';
     const dx = cx + p.facing * 22, dy = p.y + 6 + (1 - p.pusuT) * 10;
@@ -880,7 +960,7 @@ function frame(now) {
     acc += dt;
     let n = 0;
     while (acc >= STEP && n < 12) {
-      updatePlayer(STEP, inp); updateEnemies(STEP); updateFx(STEP);
+      updatePlayer(STEP, inp); updateEnemies(STEP); updateFx(STEP); updateSpine(STEP);
       jumpBuffer = Math.max(0, jumpBuffer - STEP);
       acc -= STEP; n++;
     }
