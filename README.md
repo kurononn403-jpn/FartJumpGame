@@ -45,7 +45,9 @@ WebAudioでその場で合成しています。8種類のプリセットに毎�
 
 | ゲームの状態 | 再生するアニメ |
 |---|---|
-| 立ち止まっている・空中（噴射なし） | idle |
+| 立ち止まっている | idle |
+| 空中で上昇中 / 落下中 | jump_start → jump_loop / fall_start → fall_loop |
+| プスー / 敵にぶつかった | pusu / hurt |
 | 地上で移動中 | run（移動速度に合わせて再生速度を変える） |
 | 噴射開始 | fart_start → fart_air（ループ） |
 | おならダッシュ中 | fart_air |
